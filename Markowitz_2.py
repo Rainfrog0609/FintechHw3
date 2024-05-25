@@ -74,7 +74,35 @@ class MyPortfolio:
         """
         TODO: Complete Task 4 Below
         """
+        
+        with gp.Env(empty=True) as env:
+            env.setParam('OutputFlag', 0)
+            env.start()
+            with gp.Model(env=env) as model:
+                n = len(assets)
+                w = model.addMVar(n, lb=0.0, ub=1.0, name='w')
+                
+                window_return = self.returns[assets].rolling(self.lookback)
+                mean = window_return.mean().iloc[-1]
+                std = window_return.std().iloc[-1]
+                # set objective function
+                risk_free_ratio = 0.1
+                sharpe = (mean - risk_free_ratio) / std
+                model.setObjective(gp.quicksum(sharpe[i] * w[i] for i in range(n)), gp.GRB.MAXIMIZE)
 
+
+                model.addConstrs((w[i] >= 0 for i in range(n)))
+                    
+                model.addConstr(w.sum() == 1)
+                
+                model.optimize()
+                
+
+                solution = []
+                for i in range(n): solution.append(w[i].x)
+                    
+        self.portfolio_weights.loc[:, assets] = solution
+        
         """
         TODO: Complete Task 4 Above
         """

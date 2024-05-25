@@ -66,7 +66,10 @@ class EqualWeightPortfolio:
         """
         TODO: Complete Task 1 Below
         """
-
+        
+        # equal portion for all assets
+        self.portfolio_weights.loc[:, assets] = 1 / len(assets)
+        
         """
         TODO: Complete Task 1 Above
         """
@@ -117,7 +120,13 @@ class RiskParityPortfolio:
         """
         TODO: Complete Task 2 Below
         """
-
+        
+        for i in range(self.lookback + 1, len(df)): # start from 1, index 0 has no pct_change
+            returns = df_returns.copy()[assets]
+            asset_vol = returns.iloc[i - self.lookback : i].std()
+            inv_vol = 1 / asset_vol
+            self.portfolio_weights.loc[df.index[i], assets] = inv_vol / inv_vol.sum()
+    
         """
         TODO: Complete Task 2 Above
         """
@@ -189,11 +198,22 @@ class MeanVariancePortfolio:
                 """
                 TODO: Complete Task 3 Below
                 """
+                # weights
+                w = model.addVars(n, lb=0.0, ub=1.0, name='w')
+                
+                
+                objective = \
+                    gp.quicksum(mu[i] * w[i] for i in range(n)) - \
+                    ((gamma / 2) * gp.quicksum(w[i] * Sigma[i,j] * w[j] \
+                                        for i in range(n) for j in range(n)))
+                
 
-                # Sample Code: Initialize Decision w and the Objective
-                # NOTE: You can modify the following code
-                w = model.addMVar(n, name="w", ub=1)
-                model.setObjective(w.sum(), gp.GRB.MAXIMIZE)
+                model.addConstrs((w[i] >= 0 for i in range(n)), 
+                                 name='long_only_constraint')
+                
+                model.addConstr(w.sum() == 1)
+                
+                model.setObjective(objective, gp.GRB.MAXIMIZE)
 
                 """
                 TODO: Complete Task 3 Below
@@ -368,7 +388,7 @@ class AssignmentJudge:
             if (
                 df1[column].dtype.kind in "bifc" and df2[column].dtype.kind in "bifc"
             ):  # Check only numeric types
-                if not np.isclose(df1[column], df2[column], atol=tolerance).all():
+                if not np.isclose(df1[column], df2[column], rtol=tolerance).all():
                     return False
             else:
                 if not (df1[column] == df2[column]).all():
@@ -385,13 +405,14 @@ class AssignmentJudge:
             result = self.check_dataframe_similarity(df1, df2, tolerance)
             results.append(result)
 
-        return results == [True] * len(results)
+        return results
 
     def compare_dataframe(self, df1, df2, tolerance=0.01):
         return self.check_dataframe_similarity(df1, df2, tolerance)
 
     def check_answer_eqw(self, eqw_dataframe):
         answer_dataframe = pd.read_pickle(self.eqw_path)
+        # testlog('ans', answer_dataframe, above=True, below=True)
         if self.compare_dataframe(answer_dataframe, eqw_dataframe):
             print("Problem 1 Complete - Get 10 Points")
             return 10
